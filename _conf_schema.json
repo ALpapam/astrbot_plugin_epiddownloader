@@ -43,6 +43,27 @@
                 "hint": "HTTP 代理地址，如 http://127.0.0.1:7890。Pixiv 需能访问日本网络，E-Hentai 需能访问其站点。留空则不使用代理。",
                 "default": ""
             },
+            "pixiv_send_mode": {
+                "description": "P站发送模式",
+                "type": "string",
+                "hint": "原图直发：下载后发送高清原图到聊天（不打包，默认）。压缩包/PDF/两者：预览后发送打包文件。仅预览：只发合并转发预览。",
+                "default": "原图直发",
+                "options": [
+                    "原图直发",
+                    "压缩包",
+                    "PDF",
+                    "两者",
+                    "仅预览"
+                ]
+            },
+            "pixiv_direct_merge_threshold": {
+                "description": "直发合并转发阈值",
+                "type": "int",
+                "hint": "原图直发模式下，图片张数超过此值时改用合并转发发送（避免逐张刷屏）。默认3张。设为很大的值（如9999）则始终逐张直发。",
+                "default": 3,
+                "min": 1,
+                "max": 9999
+            },
             "pixiv_login_method": {
                 "description": "Pixiv登录方式",
                 "type": "string",

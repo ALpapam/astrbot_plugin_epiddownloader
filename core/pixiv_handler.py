@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent
+from astrbot.api.message_components import Image, Node, Nodes
 
 from .base_handler import BaseDownloadMixin
 from .paths import get_pixiv_cache_path
@@ -120,7 +121,9 @@ class PixivDownloadMixin(BaseDownloadMixin):
                 yield result
             return
 
-        output_mode = self.ep_output_mode
+        # P站使用专属发送模式（默认原图直发），与 E站共享的 output_mode 分离
+        output_mode = self.ep_pixiv_send_mode
+        direct_send = output_mode == "原图直发"
         send_pdf = output_mode in ("PDF", "两者")
         send_zip = output_mode in ("压缩包", "两者")
         send_files = output_mode != "仅预览"
@@ -183,13 +186,18 @@ class PixivDownloadMixin(BaseDownloadMixin):
         images_cached = self._check_cached_images_exist("pixiv", pid)
         cached_pdf, cached_zip = self._check_cached_outputs("pixiv", pid, title)
 
-        need_zip = send_zip and cached_zip is None
-        need_pdf = send_pdf and cached_pdf is None
-        if send_files:
-            output_cache_hit = not need_zip and not need_pdf
-        else:
-            # 仅预览模式：只要图片已缓存即可直接发预览，无需输出文件
+        if direct_send:
+            # 原图直发模式：只需图片缓存，无需输出文件
+            need_zip = need_pdf = False
             output_cache_hit = True
+        else:
+            need_zip = send_zip and cached_zip is None
+            need_pdf = send_pdf and cached_pdf is None
+            if send_files:
+                output_cache_hit = not need_zip and not need_pdf
+            else:
+                # 仅预览模式：只要图片已缓存即可直接发预览，无需输出文件
+                output_cache_hit = True
 
         all_image_paths: list[Path] = []
         if images_cached:
@@ -198,6 +206,18 @@ class PixivDownloadMixin(BaseDownloadMixin):
         # 4. 完全缓存命中
         if images_cached and output_cache_hit and all_image_paths:
             logger.info(f"📦 P站缓存完全命中: pid={pid}, 跳过下载和生成")
+            summary = (
+                f"✅ 获取完成: {title}\n"
+                f"作者: {author} | 图片: {len(all_image_paths)}张 | 耗时: {time.perf_counter() - process_start:.1f}s"
+            )
+            if direct_send:
+                # 原图直发：直接发送缓存的高清原图
+                yield event.plain_result(f"📥 开始获取「{title}」，请稍候...")
+                async for result in self._send_images_direct(event, all_image_paths, summary):
+                    yield result
+                self._finalize_cache_cleanup()
+                return
+
             preview_paths = self._limit_preview(all_image_paths, event)
             yield event.plain_result(f"📥 开始获取「{title}」，请稍候...")
             nodes = self._build_merge_preview_nodes(
@@ -207,10 +227,6 @@ class PixivDownloadMixin(BaseDownloadMixin):
             yield event.chain_result([nodes])
             await asyncio.sleep(1)
 
-            summary = (
-                f"✅ 获取完成: {title}\n"
-                f"作者: {author} | 图片: {len(all_image_paths)}张 | 耗时: {time.perf_counter() - process_start:.1f}s"
-            )
             async for result in self._send_cached_outputs(
                 event, "pixiv", pid, title, output_mode, summary
             ):
@@ -243,10 +259,15 @@ class PixivDownloadMixin(BaseDownloadMixin):
             return
 
         # 6. 全新下载
-        yield event.plain_result(
-            f"📥 开始获取「{title}」，共{len(image_urls)}张图，请稍候...\n"
-            f"⚠️ 预览图片可能因数量过多而发送失败，属正常现象"
-        )
+        if direct_send:
+            yield event.plain_result(
+                f"📥 开始获取「{title}」，共{len(image_urls)}张高清原图，请稍候..."
+            )
+        else:
+            yield event.plain_result(
+                f"📥 开始获取「{title}」，共{len(image_urls)}张图，请稍候...\n"
+                f"⚠️ 预览图片可能因数量过多而发送失败，属正常现象"
+            )
 
         # 下载目录
         item_dir = get_pixiv_cache_path() / str(pid)
@@ -293,34 +314,85 @@ class PixivDownloadMixin(BaseDownloadMixin):
             return
 
         all_image_paths = sorted(downloaded_paths)
-        logger.info(
-            f"🖼️ 共获取 {len(all_image_paths)} 张图片，准备发送合并转发"
-        )
-
-        preview_paths = self._limit_preview(all_image_paths, event)
-        nodes = self._build_merge_preview_nodes(
-            event, "pixiv", pid, title, author, tags,
-            [f"共{page_count}张图"], preview_paths,
-        )
-        yield event.chain_result([nodes])
-        await asyncio.sleep(1)
 
         total_time = time.perf_counter() - process_start
         summary = (
             f"✅ 获取完成: {title}\n"
             f"作者: {author} | 成功: {success_urls}张 | 失败: {fail_count}张 | 耗时: {total_time:.1f}s"
         )
-        if send_files:
-            async for result in self._generate_and_send_outputs(
-                event, "pixiv", pid, title, all_image_paths,
-                output_mode, summary,
-            ):
+
+        if direct_send:
+            # 原图直发：逐张发送高清原图，不打包、不预览
+            logger.info(f"🖼️ 共获取 {len(all_image_paths)} 张高清原图，开始直发")
+            async for result in self._send_images_direct(event, all_image_paths, summary):
                 yield result
         else:
-            yield event.plain_result(summary)
+            logger.info(
+                f"🖼️ 共获取 {len(all_image_paths)} 张图片，准备发送合并转发"
+            )
+            preview_paths = self._limit_preview(all_image_paths, event)
+            nodes = self._build_merge_preview_nodes(
+                event, "pixiv", pid, title, author, tags,
+                [f"共{page_count}张图"], preview_paths,
+            )
+            yield event.chain_result([nodes])
+            await asyncio.sleep(1)
+
+            if send_files:
+                async for result in self._generate_and_send_outputs(
+                    event, "pixiv", pid, title, all_image_paths,
+                    output_mode, summary,
+                ):
+                    yield result
+            else:
+                yield event.plain_result(summary)
 
         self._log_download_complete("Pixiv", pid, title, len(all_image_paths), total_time)
         self._finalize_cache_cleanup()
+
+    async def _send_images_direct(
+        self, event: AstrMessageEvent, image_paths: list[Path], summary: str
+    ) -> AsyncGenerator:
+        """原图直发：图片少时逐张发送高清原图；图片多于阈值时改用合并转发（避免刷屏）"""
+        threshold = self.ep_pixiv_direct_merge_threshold
+        if len(image_paths) > threshold:
+            async for result in self._send_images_merged(event, image_paths, summary):
+                yield result
+            return
+
+        total = len(image_paths)
+        for i, p in enumerate(image_paths, start=1):
+            if not p.exists():
+                continue
+            yield event.chain_result([Image.fromFileSystem(str(p.resolve()))])
+            logger.info(f"📤 发送原图 [{i}/{total}]: {p.name}")
+            # 间隔发送，避免触发消息频率限制
+            await asyncio.sleep(0.5)
+        if summary:
+            yield event.plain_result(summary)
+
+    async def _send_images_merged(
+        self, event: AstrMessageEvent, image_paths: list[Path], summary: str
+    ) -> AsyncGenerator:
+        """图片较多时用合并转发批量发送原图（分批，每批最多50个节点）"""
+        valid = [p for p in image_paths if p.exists()]
+        sender_uin = self._get_merge_sender_uin(event)
+        batch_size = 50
+
+        for start in range(0, len(valid), batch_size):
+            nodes = Nodes([])
+            batch = valid[start:start + batch_size]
+            for p in batch:
+                nodes.nodes.append(
+                    Node(uin=sender_uin, content=[Image.fromFileSystem(str(p.resolve()))])
+                )
+            logger.info(
+                f"📤 合并转发发送原图 [{start+1}-{start+len(batch)}] 共{len(valid)}张"
+            )
+            yield event.chain_result([nodes])
+            await asyncio.sleep(1)
+        if summary:
+            yield event.plain_result(summary)
 
     def _limit_preview(self, paths: list[Path], event: AstrMessageEvent) -> list[Path]:
         """按群聊/私聊限制预览图片数量"""

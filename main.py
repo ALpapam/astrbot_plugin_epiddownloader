@@ -18,8 +18,8 @@ _CLEAR_KEYWORDS = ("del-cache", "delcache", "clearcache", "clear")
 @register(
     "astrbot_plugin_epiddownloader",
     "ncy",
-    "P站/E站资源下载：.pid <作品ID> 下载Pixiv插画，.eid <画廊ID或URL> 下载E-Hentai画廊",
-    "1.0.0",
+    "P站/E站资源下载：.pid <作品ID> 下载Pixiv插画并直发高清原图，.eid <画廊ID或URL> 下载E-Hentai画廊",
+    "1.02",
 )
 class EpidDownloader(PixivDownloadMixin, EHentaiDownloadMixin, Star):
     def __init__(self, context: Context, config=None):
@@ -130,6 +130,7 @@ class EpidDownloader(PixivDownloadMixin, EHentaiDownloadMixin, Star):
                 "• /pid <作品ID>\n"
                 "• 示例: /pid 59580629\n"
                 "• 自动获取作品全部图片（含多图集）\n"
+                "• 默认逐张直发高清原图（不打包）\n"
                 "• 也支持 /pixiv 别名"
             ),
             (
@@ -144,9 +145,8 @@ class EpidDownloader(PixivDownloadMixin, EHentaiDownloadMixin, Star):
             (
                 "📤 输出格式",
                 "━━━━━━━━━━━━━━━━━━━━\n"
-                "• 每次下载先发送合并转发预览\n"
-                "• 预览后按配置发送 ZIP 压缩包 / PDF\n"
-                "• 默认: 合并转发预览 + ZIP压缩包\n"
+                "• P站默认: 逐张直发高清原图（不打包）\n"
+                "• E站默认: 合并转发预览 + ZIP压缩包\n"
                 "• 可在 WebUI 配置中切换发送模式\n"
                 "• ZIP 可设置加密密码（默认不加密）"
             ),

@@ -49,6 +49,13 @@ class BaseDownloadMixin:
         self.ep_output_mode = str(
             self._get_config_value("ep_settings.output_mode", "压缩包")
         ).strip()
+        self.ep_pixiv_send_mode = str(
+            self._get_config_value("ep_settings.pixiv_send_mode", "原图直发")
+        ).strip()
+        self.ep_pixiv_direct_merge_threshold = max(
+            1,
+            int(self._get_config_value("ep_settings.pixiv_direct_merge_threshold", 3)),
+        )
         self.ep_zip_password = str(
             self._get_config_value("ep_settings.zip_password", "")
         ).strip()
