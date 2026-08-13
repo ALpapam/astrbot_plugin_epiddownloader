@@ -1,0 +1,158 @@
+{
+    "ep_settings": {
+        "description": "P/E站下载设置",
+        "type": "object",
+        "items": {
+            "output_mode": {
+                "description": "发送模式",
+                "type": "string",
+                "hint": "仅预览：只发送合并转发预览图。压缩包：预览后将所有图片打包为ZIP发送。PDF：预览后发送PDF（体积优化）。两者：同时发送ZIP+PDF。",
+                "default": "压缩包",
+                "options": [
+                    "仅预览",
+                    "压缩包",
+                    "PDF",
+                    "两者"
+                ]
+            },
+            "zip_password": {
+                "description": "ZIP加密密码",
+                "type": "string",
+                "hint": "ZIP文件加密密码，留空则不加密。密码会随等待发送消息一起显示。",
+                "default": ""
+            },
+            "preview_images_group": {
+                "description": "群聊预览图片数",
+                "type": "int",
+                "hint": "群聊合并转发预览中最多显示的图片张数（建议≤20，过多容易导致合并转发失效）。默认5张。",
+                "default": 5,
+                "min": 1,
+                "max": 999
+            },
+            "preview_images_private": {
+                "description": "私聊预览图片数",
+                "type": "int",
+                "hint": "私聊合并转发预览中最多显示的图片张数。默认50张。",
+                "default": 50,
+                "min": 1,
+                "max": 999
+            },
+            "proxy": {
+                "description": "代理地址",
+                "type": "string",
+                "hint": "HTTP 代理地址，如 http://127.0.0.1:7890。Pixiv 需能访问日本网络，E-Hentai 需能访问其站点。留空则不使用代理。",
+                "default": ""
+            },
+            "pixiv_login_method": {
+                "description": "Pixiv登录方式",
+                "type": "string",
+                "hint": "密码：使用账号密码登录。refresh_token：使用 refresh token 登录（更稳定，推荐，获取方式见 README）。",
+                "default": "密码",
+                "options": [
+                    "密码",
+                    "refresh_token"
+                ]
+            },
+            "pixiv_username": {
+                "description": "Pixiv账号",
+                "type": "string",
+                "hint": "Pixiv 登录邮箱或用户名。部分账号可能触发验证码导致密码登录失败，此时建议改用 refresh_token。",
+                "default": ""
+            },
+            "pixiv_password": {
+                "description": "Pixiv密码",
+                "type": "string",
+                "hint": "Pixiv 登录密码。",
+                "default": ""
+            },
+            "pixiv_refresh_token": {
+                "description": "Pixiv refresh_token",
+                "type": "string",
+                "hint": "优先使用 refresh token 认证（最稳定）。获取方式见 README。留空则使用账号密码登录。",
+                "default": ""
+            },
+            "ehentai_cookies": {
+                "description": "E-Hentai Cookies",
+                "type": "string",
+                "hint": "登录 e-hentai 后的 Cookie 字符串，如 ipb_member_id=xxx; ipb_pass_hash=yyy。填写后可获取更高分辨率原图（强烈建议填写）。",
+                "default": ""
+            },
+            "ehentai_use_exhentai": {
+                "description": "使用 ExHentai 域名",
+                "type": "bool",
+                "hint": "开启后画廊访问走 exhentai.org（需有效 Cookie，否则访问失败）。默认关闭，走 e-hentai.org。",
+                "default": false
+            },
+            "cache_retention_days": {
+                "description": "缓存保留天数",
+                "type": "int",
+                "hint": "下载的源图片和生成的压缩包缓存保留天数，超出后自动清理。",
+                "default": 3,
+                "min": 1,
+                "max": 30
+            },
+            "cache_max_size_gb": {
+                "description": "缓存最大大小(GB)",
+                "type": "float",
+                "hint": "缓存总大小超过此上限时，自动清理超过12小时的旧文件。设为 0 禁用。",
+                "default": 3.0,
+                "min": 0,
+                "max": 100
+            },
+            "rate_limit_seconds": {
+                "description": "群组限速间隔(秒)",
+                "type": "int",
+                "hint": "同一群两次下载之间最少间隔秒数。设为 0 禁用限速。",
+                "default": 60,
+                "min": 0,
+                "max": 600
+            },
+            "merge_send_as_sender": {
+                "description": "合并转发显示为发送者",
+                "type": "bool",
+                "hint": "开启后合并转发的发送人显示为发送指令的用户；关闭则显示为 Bot。",
+                "default": false
+            },
+            "whitelist_enabled": {
+                "description": "开启群白名单",
+                "type": "bool",
+                "hint": "开启后，仅白名单群号可使用 .pid/.eid 指令。私聊不受限制。默认开启。",
+                "default": true
+            },
+            "whitelist_groups": {
+                "description": "白名单群号",
+                "type": "string",
+                "hint": "允许使用的群号，多个用英文逗号分隔，如 123456,789012。",
+                "default": ""
+            },
+            "admin_qq": {
+                "description": "管理员QQ",
+                "type": "string",
+                "hint": "在白名单拒绝提示和帮助中显示的管理员联系方式，留空则显示「请联系本群管理员」。",
+                "default": ""
+            },
+            "allow_private_chat": {
+                "description": "允许私聊下载",
+                "type": "bool",
+                "hint": "开启后允许用户在私聊中使用指令下载。关闭则仅允许群聊。默认开启。",
+                "default": true
+            },
+            "file_merge_forward_enabled": {
+                "description": "群聊文件合并转发",
+                "type": "bool",
+                "hint": "开启后，群聊中 ZIP/PDF 以合并转发发送。私聊始终以单独文件发送。",
+                "default": true
+            },
+            "error_notify_mode": {
+                "description": "错误通知模式",
+                "type": "string",
+                "hint": "控制下载失败时 Bot 是否通知用户。静默：仅记录日志；通知：告知用户错误原因。",
+                "default": "通知",
+                "options": [
+                    "静默",
+                    "通知"
+                ]
+            }
+        }
+    }
+}

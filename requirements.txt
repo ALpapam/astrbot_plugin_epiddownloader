@@ -1,0 +1,8 @@
+pixivpy3>=3.7.0
+curl_cffi>=0.7.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+Pillow>=10.0.0
+reportlab>=4.0.0
+pyzipper>=0.3.6
+cryptography
