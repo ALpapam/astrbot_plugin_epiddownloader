@@ -9,6 +9,8 @@ import traceback
 from pathlib import Path
 from typing import AsyncGenerator
 
+from PIL import Image as PILImage
+
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent
 from astrbot.api.message_components import File, Image, Node, Nodes, Plain
@@ -286,7 +288,6 @@ class BaseDownloadMixin:
             jpg_path = img_path.with_suffix(".preview.jpg")
             if not jpg_path.exists():
                 try:
-                    from PIL import Image as PILImage
                     img = PILImage.open(str(img_path))
                     if img.mode in ("RGBA", "P", "LA"):
                         img = img.convert("RGB")

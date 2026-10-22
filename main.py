@@ -19,7 +19,7 @@ _CLEAR_KEYWORDS = ("del-cache", "delcache", "clearcache", "clear")
     "astrbot_plugin_epiddownloader",
     "ncy",
     "P站/E站资源下载：.pid <作品ID> 下载Pixiv插画并直发高清原图，.eid <画廊ID或URL> 下载E-Hentai画廊",
-    "1.02",
+    "1.03",
 )
 class EpidDownloader(PixivDownloadMixin, EHentaiDownloadMixin, Star):
     def __init__(self, context: Context, config=None):

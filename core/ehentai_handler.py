@@ -14,6 +14,9 @@ from pathlib import Path
 from typing import AsyncGenerator
 from urllib.parse import urlparse
 
+import curl_cffi.requests as creq
+from bs4 import BeautifulSoup
+
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent
 
@@ -42,8 +45,6 @@ class EHentaiDownloadMixin(BaseDownloadMixin):
     # ---------- 会话 ----------
     def _get_session(self):
         """构建 curl_cffi 会话（Chrome 指纹伪装 + Cookie + 代理）"""
-        import curl_cffi.requests as creq
-
         session = creq.Session(impersonate="chrome")
         if self.ep_proxy:
             session.proxies = {"http": self.ep_proxy, "https": self.ep_proxy}
@@ -181,8 +182,6 @@ class EHentaiDownloadMixin(BaseDownloadMixin):
         self, session, gid: str, token: str, title_hint: str = ""
     ) -> dict:
         """回退：从画廊首页 HTML 解析元信息"""
-        from bs4 import BeautifulSoup
-
         info = {
             "title": title_hint or "未知标题",
             "page_count": 0,
@@ -232,8 +231,6 @@ class EHentaiDownloadMixin(BaseDownloadMixin):
     @staticmethod
     def extract_image_url_from_page(text: str) -> str | None:
         """从画廊单页 HTML 提取当前图片 URL"""
-        from bs4 import BeautifulSoup
-
         soup = BeautifulSoup(text, "lxml")
         img = soup.find("img", id="img")
         if img:
@@ -250,8 +247,6 @@ class EHentaiDownloadMixin(BaseDownloadMixin):
     @staticmethod
     def _extract_next_href(text: str) -> str | None:
         """从画廊单页 HTML 提取下一页链接（<a id="next">）"""
-        from bs4 import BeautifulSoup
-
         soup = BeautifulSoup(text, "lxml")
         a = soup.find("a", id="next")
         if a and a.get("href"):
@@ -524,7 +519,6 @@ class EHentaiDownloadMixin(BaseDownloadMixin):
                     )
                     if resp and resp.text:
                         page_count = 0
-                        from bs4 import BeautifulSoup
                         gsc = BeautifulSoup(resp.text, "lxml").find("span", id="gsc")
                         if gsc:
                             try:

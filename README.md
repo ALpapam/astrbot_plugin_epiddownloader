@@ -54,11 +54,24 @@ python >= 3.10
 
 > **打包注意事项**：压缩包内文件应位于**根目录**（`main.py`、`metadata.yaml` 等在 zip 根目录下，而非外层文件夹）。
 
-### 手动安装依赖（可选）
+### 依赖安装（v1.03 起加载时自动校验）
 
-> ⚠️ **仅在 zip 包上传或从链接安装失败时需要手动安装依赖**
+v1.03 起，插件在**加载阶段**就导入 `pixivpy3`、`curl_cffi`、`bs4` 等依赖：
 
-在 AstrBot WebUI → 左侧 **平台日志** → 右上角 **安装pip库**，逐行输入以下内容并执行：
+- 依赖齐全 → 插件正常加载
+- 依赖缺失 → 插件**直接加载失败**，日志给出明确提示，同时可触发 AstrBot 的依赖自动安装；不会再出现"插件看起来正常、发 `/pid` 时才报 `No module named 'pixivpy3'`"
+
+安装插件（上传 zip / 从链接安装）时，较新版本的 AstrBot 会自动执行 `requirements.txt`。若仍然提示缺包（常见于**手动拷贝插件目录**、**Docker 升级镜像后 pip 包丢失**），请在 AstrBot 运行环境执行：
+
+```bash
+# Docker 部署
+docker exec -it <容器名> python -m pip install -r /AstrBot/data/plugins/astrbot_plugin_epiddownloader/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 源码 / venv 部署
+pip install -r data/plugins/astrbot_plugin_epiddownloader/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+```
+
+也可以在 AstrBot WebUI → 左侧 **平台日志** → 右上角 **安装pip库**，逐行输入以下内容并执行：
 
 ```
 pixivpy3>=3.7.0
@@ -71,7 +84,7 @@ pyzipper>=0.3.6
 cryptography
 ```
 
-> **Docker/Linux 部署**：以上库均有 manylinux 预编译轮子，`pip install` 即可，无需编译。若 AstrBot 运行在 Docker 容器内，请确认容器 Python 版本 ≥ 3.10。
+> **Docker/Linux 部署**：以上库均有 manylinux 预编译轮子，`pip install` 即可，无需编译。若 AstrBot 运行在 Docker 容器内，请确认容器 Python 版本 ≥ 3.10。**每次 `docker compose pull` 升级镜像后建议重新安装一次依赖**（镜像层会覆盖 pip 包）。
 
 ### 打包
 
@@ -84,7 +97,7 @@ zip -r ../astrbot_plugin_epiddownloader.zip . -x "*.git/*" "__pycache__/*" "*.py
 
 > ⚠️ Pixiv 官方 API 现在**强制要求登录**，即使公开作品也需要。不配置登录信息则无法使用 `.pid`。
 
-在 AstrBot WebUI 插件配置的 `pixiv_*` 项中二选一：
+在 AstrBot WebUI 插件配置的 `pixiv_*` 项中二选一（v1.03 起 `pixiv_login_method` 真正生效：按所选方式优先登录，未填写对应凭据时自动回退到另一种方式）：
 
 **方式一：账号密码（简单，可能不稳定）**
 - `pixiv_login_method` 选择 `密码`
@@ -95,6 +108,8 @@ zip -r ../astrbot_plugin_epiddownloader.zip . -x "*.git/*" "__pycache__/*" "*.py
 - `pixiv_login_method` 选择 `refresh_token`
 - 填写 `pixiv_refresh_token`
 - 获取方式：使用浏览器抓包 Pixiv 登录返回的 `refresh_token`，或使用第三方工具（如 pixiv-token 相关开源项目）生成
+
+> 更换 `pixiv_refresh_token` 后**无需重启 AstrBot**：v1.03 起插件检测到登录配置变化会自动重建登录会话。
 
 **其他建议：**
 - 中国大陆网络需配置 `proxy`（如 `http://127.0.0.1:7890`），确保能访问 Pixiv API
@@ -130,7 +145,7 @@ zip -r ../astrbot_plugin_epiddownloader.zip . -x "*.git/*" "__pycache__/*" "*.py
 | `preview_images_group` | 整数 | 5 | 群聊合并转发预览图片数 |
 | `preview_images_private` | 整数 | 50 | 私聊合并转发预览图片数 |
 | `proxy` | 字符串 | (空) | HTTP 代理地址 |
-| `pixiv_login_method` | 下拉 | 密码 | Pixiv 登录方式：密码 / refresh_token |
+| `pixiv_login_method` | 下拉 | refresh_token | Pixiv 登录方式：refresh_token / 密码（按所选方式优先，另一种方式兜底） |
 | `pixiv_username` | 字符串 | (空) | Pixiv 账号 |
 | `pixiv_password` | 字符串 | (空) | Pixiv 密码 |
 | `pixiv_refresh_token` | 字符串 | (空) | Pixiv refresh_token（推荐） |
@@ -189,6 +204,11 @@ astrbot_plugin_epiddownloader/
 **P站登录失败？**
 - 确认账号密码正确，或改用 refresh_token
 - 部分账号有验证码/地区限制，建议使用已过成人认证的日本区域账号
+- 服务器无法访问 Pixiv、代理不可用也会表现为登录失败，请检查 `proxy` 配置
+
+**提示 `No module named 'pixivpy3'` / `缺少 Python 依赖`？**
+- 这不是 token 或账号的问题，是 AstrBot 运行环境缺少 Python 依赖
+- 按上文「依赖安装」在 AstrBot 所在环境执行 `pip install -r requirements.txt`，再重载插件或重启 AstrBot
 
 **E站返回空响应/被拦截？**
 - 配置 `ehentai_cookies`（登录后从浏览器复制 Cookie）
@@ -198,6 +218,14 @@ astrbot_plugin_epiddownloader/
 - 预览图片过多导致，降低 `preview_images_group`（建议 ≤ 20）
 
 ## 版本历史
+
+### v1.03
+- **依赖改为加载时导入**：`pixivpy3`、`curl_cffi`、`bs4`、`PIL` 等不再懒加载，缺包时插件加载即失败并给出明确提示，也可触发 AstrBot 的插件依赖自动安装；不会再出现"插件正常但 `/pid` 报 `No module named 'pixivpy3'`"
+- **错误提示区分类型**：缺依赖时明确提示安装 `requirements.txt`；登录失败时补充"代理/网络不可达也会登录失败"的说明，不再把所有异常都归咎于账号密码
+- **修复 `pixiv_login_method` 实际不生效**：现在按所选登录方式优先认证，另一种方式作为兜底，老配置不受影响（默认值改为 `refresh_token`）
+- **更换 refresh_token 无需重启**：登录配置变化时自动重建 API 会话
+- **修复 `metadata.yaml` 的 `repo` 指向了别人的仓库**，改为本插件仓库地址
+- `pyzipper` 改为加载时探测：缺失时仅退化为无密码 ZIP，不影响插件加载
 
 ### v1.02
 - 原图直发新增**合并转发阈值**：图片超过 `pixiv_direct_merge_threshold`（默认3张）时改用合并转发批量发送，避免逐张刷屏；阈值可在 WebUI 配置

@@ -14,6 +14,17 @@ from PIL import Image
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
 
+try:
+    import pyzipper  # ZIP AES 加密（可选：缺失时退化为无密码 ZIP）
+
+    _PYZIPPER_AVAILABLE = True
+except ImportError:  # pragma: no cover
+    pyzipper = None
+    _PYZIPPER_AVAILABLE = False
+    logger.warning(
+        "未安装 pyzipper，ZIP 加密功能不可用（可执行 pip install pyzipper 修复）"
+    )
+
 # PDF 预处理：长边超过此值则等比缩放
 _PDF_MAX_LONG_EDGE = 2000
 # JPEG 质量
@@ -242,8 +253,9 @@ def _try_encrypt_zip(zip_path: str, converted_paths: list[str], password: str) -
         (是否成功, 加密方式名称)
     """
     # 1. 尝试 pyzipper（使用 AES 加密）
+    if not _PYZIPPER_AVAILABLE:
+        return False, ""
     try:
-        import pyzipper
         with pyzipper.AESZipFile(
             zip_path,
             "w",
@@ -254,8 +266,6 @@ def _try_encrypt_zip(zip_path: str, converted_paths: list[str], password: str) -
             for jpg_path in converted_paths:
                 zf.write(jpg_path, Path(jpg_path).name)
         return True, "加密(pyzipper/AES)"
-    except ImportError:
-        pass
     except Exception as exc:
         logger.debug(f"pyzipper 加密失败: {exc}")
 

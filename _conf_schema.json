@@ -67,8 +67,8 @@
             "pixiv_login_method": {
                 "description": "Pixiv登录方式",
                 "type": "string",
-                "hint": "密码：使用账号密码登录。refresh_token：使用 refresh token 登录（更稳定，推荐，获取方式见 README）。",
-                "default": "密码",
+                "hint": "refresh_token：优先使用 refresh token 登录（更稳定，推荐，获取方式见 README）。密码：优先使用账号密码登录。所选方式未填写对应凭据时会自动回退到另一种方式。",
+                "default": "refresh_token",
                 "options": [
                     "密码",
                     "refresh_token"

@@ -1,8 +1,10 @@
 """Pixiv（P站）下载逻辑 — 基于 pixivpy3
 
-- 支持 refresh_token 与账号密码两种登录方式（优先 refresh_token）
+- 支持 refresh_token 与账号密码两种登录方式（由 pixiv_login_method 决定优先级，另一种兜底）
 - 多图作品（meta_pages）逐张下载，ugora 动画取静态海报帧
 - 图片缓存于 {cache}/pixiv/{pid}/，输出文件缓存于 {cache}/_output/
+- 第三方依赖在模块加载时导入：缺失时插件加载即失败并提示明确原因，
+  同时可触发 AstrBot 的插件依赖自动安装，避免执行指令时才暴露问题
 """
 import asyncio
 import time
@@ -10,6 +12,8 @@ import traceback
 from pathlib import Path
 from typing import AsyncGenerator
 from urllib.parse import urlparse
+
+from pixivpy3 import AppPixivAPI
 
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent
@@ -24,14 +28,28 @@ class PixivDownloadMixin(BaseDownloadMixin):
 
     # 共享 API 实例（pixivpy 会话非线程安全，串行访问）
     _pixiv_api = None
+    # 缓存实例对应的登录配置快照：配置变更（如换了 refresh_token）后自动重建
+    _pixiv_api_key = None
 
     # ---------- Pixiv API ----------
+    def _pixiv_auth_key(self) -> tuple:
+        """与登录相关的配置快照，用于判断缓存的 API 实例是否仍然可用"""
+        return (
+            self.ep_pixiv_login_method,
+            self.ep_pixiv_refresh_token,
+            self.ep_pixiv_username,
+            self.ep_pixiv_password,
+            self.ep_proxy,
+        )
+
     def _get_pixiv_api(self):
         """构建并缓存 Pixiv API 实例，自动登录"""
-        if PixivDownloadMixin._pixiv_api is not None:
+        auth_key = self._pixiv_auth_key()
+        if (
+            PixivDownloadMixin._pixiv_api is not None
+            and PixivDownloadMixin._pixiv_api_key == auth_key
+        ):
             return PixivDownloadMixin._pixiv_api
-
-        from pixivpy3 import AppPixivAPI
 
         kwargs = {}
         if self.ep_proxy:
@@ -40,16 +58,29 @@ class PixivDownloadMixin(BaseDownloadMixin):
         api = AppPixivAPI(**kwargs)
         api.set_accept_language("zh-cn")
 
-        if self.ep_pixiv_refresh_token:
+        method = (self.ep_pixiv_login_method or "").strip()
+        has_token = bool(self.ep_pixiv_refresh_token)
+        has_password = bool(self.ep_pixiv_username and self.ep_pixiv_password)
+
+        # pixiv_login_method 决定优先方式，另一种方式保留为兜底（兼容老配置）
+        prefer_token = method != "密码"
+        if prefer_token and has_token:
             logger.info("🔑 Pixiv 使用 refresh_token 认证")
             api.auth(refresh_token=self.ep_pixiv_refresh_token)
-        elif self.ep_pixiv_username and self.ep_pixiv_password:
+        elif has_password:
             logger.info("🔑 Pixiv 使用账号密码认证")
             api.auth(username=self.ep_pixiv_username, password=self.ep_pixiv_password)
+        elif has_token:
+            logger.info("🔑 当前登录方式无可用凭据，回退使用 refresh_token 认证")
+            api.auth(refresh_token=self.ep_pixiv_refresh_token)
         else:
-            raise RuntimeError("未配置 Pixiv 登录信息（账号密码或 refresh_token 至少填一项）")
+            raise RuntimeError(
+                "未配置 Pixiv 登录信息（账号密码或 refresh_token 至少填一项，"
+                f"当前登录方式: {method or '未设置'}）"
+            )
 
         PixivDownloadMixin._pixiv_api = api
+        PixivDownloadMixin._pixiv_api_key = auth_key
         return api
 
     # ---------- 图片 URL 提取 ----------
@@ -132,6 +163,18 @@ class PixivDownloadMixin(BaseDownloadMixin):
         async with self._pixiv_lock():
             try:
                 api = self._get_pixiv_api()
+            except (ImportError, ModuleNotFoundError) as exc:
+                self._release_rate_limit(event)
+                logger.error(f"Pixiv 依赖缺失: {exc}")
+                for result in self._yield_error(
+                    event,
+                    f"缺少 Python 依赖 pixivpy3\n"
+                    f"原因: {str(exc)[:200]}\n"
+                    f"请在 AstrBot 运行环境执行:\n"
+                    f"pip install -r data/plugins/astrbot_plugin_epiddownloader/requirements.txt",
+                ):
+                    yield result
+                return
             except Exception as exc:
                 self._release_rate_limit(event)
                 logger.error(f"Pixiv 登录失败: {exc}")
@@ -139,7 +182,8 @@ class PixivDownloadMixin(BaseDownloadMixin):
                     event,
                     f"Pixiv 登录失败\n"
                     f"原因: {str(exc)[:200]}\n"
-                    f"请检查插件配置中的账号密码或 refresh_token",
+                    f"请检查插件配置中的账号密码或 refresh_token\n"
+                    f"（服务器无法访问 Pixiv / 代理不可用时也会登录失败）",
                 ):
                     yield result
                 return

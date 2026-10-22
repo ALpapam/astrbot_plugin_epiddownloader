@@ -1,6 +1,6 @@
 name: astrbot_plugin_epiddownloader
 desc: P站(E站)资源下载，.pid <作品ID> 下载Pixiv插画并直发高清原图，.eid <画廊ID或URL> 下载E-Hentai画廊，合并转发预览 + 压缩包/PDF发送，支持缓存清理
 help: 发送 .pid 作品ID 下载Pixiv插画（默认逐张直发高清原图，含多图集），发送 .eid 画廊ID或完整URL 下载E-Hentai画廊。示例：.pid 59580629 或 .eid https://e-hentai.org/g/123456/abcdef/。.ephelp 查看帮助，.pid del-cache 清理缓存。
-version: v1.02
+version: v1.03
 author: ncy
-repo: https://github.com/FloatSakura/astrbot_plugin_jm_downloader
+repo: https://github.com/ALpapam/astrbot_plugin_epiddownloader
